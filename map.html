@@ -72,6 +72,12 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;backgroun
         <option value="price">실거래가</option>
         <option value="year">준공년도</option>
       </select></div>
+    <div id="topWrap" hidden><label class="f">표시 범위</label>
+      <select id="top">
+        <option value="0.2" selected>점수 상위 20%만</option>
+        <option value="0.5">상위 50%</option>
+        <option value="1">전체</option>
+      </select></div>
     <div><label class="f">평형 <span id="areaLab"></span></label>
       <select id="area"><option value="s">전용 59㎡ 미만</option>
         <option value="m">전용 59~84㎡ (24~29평형)</option>
@@ -143,6 +149,7 @@ function readScores() {
   } catch (e) { return null; }        // 사생활 보호 모드 등에서 접근이 막힐 수 있다
 }
 const SCORES = readScores();
+const MAP_VERSION = "2026-08-30d";     // 배포된 파일이 최신인지 확인용
 
 const HASH = new URLSearchParams(location.hash.slice(1));
 const PICK = (HASH.get("pick") || "").split(",").filter(x=>x!=="").map(Number);
@@ -239,9 +246,12 @@ function init(){
       rows = APTS.map((a,i)=>{const p=pick(a,bucket); return p?{a,i,...p}:null;}).filter(Boolean);
       if (metric === "score" && SCORES) {
         rows = rows.filter(r => SCORES.score[r.i] != null);
+        rows.sort((x,y)=> SCORES.score[y.i] - SCORES.score[x.i]);      // 높은 점수 먼저
+        const frac = Number(document.getElementById("top").value || 1);
+        if (frac < 1) rows = rows.slice(0, Math.max(1, Math.round(rows.length * frac)));
         const rank = new Map((SCORES.top||[]).map((id,k)=>[id,k+1]));
         rows.forEach(r => { if (rank.has(r.i)) r.rank = rank.get(r.i); });
-        rows.sort((x,y)=> (SCORES.score[x.i]) - (SCORES.score[y.i]));  // 높은 점수를 위에 그린다
+        rows.reverse();                       // 낮은 점수부터 그려 높은 점수가 위로 오게
       }
     }
 
@@ -253,12 +263,26 @@ function init(){
     /* 점수는 가중치에 따라 대개 20~80 안에 몰립니다. 0~100 고정 구간으로 칠하면
        거의 다 가운데 색이 돼서 '어디가 좋은지'가 안 보입니다.
        그래서 5분위로 나누되, 범례에는 실제 점수 경계를 적어 둡니다. */
-    const SCORE_COLORS = ["#9c4a2f","#b5761b","#9b8b17","#2f8a63","#0b5c3f"];
-    let lo, hi, col, cuts = [];
+    /* 점수 색은 '구간'이 아니라 연속 그라데이션입니다.
+       상위 20%만 남기면 구간 색은 전부 같은 색이 돼 버리기 때문에,
+       지금 화면에 뜬 것들 안에서의 순위(백분위)로 색을 매깁니다.
+       그래서 어떤 범위를 보든 항상 색 차이가 보입니다. */
+    const RAMP = [[156,74,47],[181,118,27],[155,139,23],[47,138,99],[11,92,63]];
+    const rampColor = t => {
+      t = Math.max(0, Math.min(1, t)) * (RAMP.length - 1);
+      const i = Math.min(RAMP.length - 2, Math.floor(t)), f = t - i;
+      const c = RAMP[i].map((v, k) => Math.round(v + (RAMP[i+1][k] - v) * f));
+      return `rgb(${c[0]},${c[1]},${c[2]})`;
+    };
+    let lo, hi, col, sv = [];
     if (metric === "score") {
-      const sv = rows.map(val).filter(v=>v!=null).sort((x,y)=>x-y);
-      cuts = [0.2,0.4,0.6,0.8].map(p => sv[Math.floor((sv.length-1)*p)]);
-      col = v => SCORE_COLORS[cuts.filter(c => v >= c).length];
+      sv = rows.map(val).filter(v=>v!=null).sort((x,y)=>x-y);
+      const pos = v => {                       // 백분위 (같은 값이 몰려도 안전하게)
+        let a = 0, b = sv.length;
+        while (a < b) { const m = (a+b) >> 1; sv[m] < v ? a = m+1 : b = m; }
+        return sv.length > 1 ? a / (sv.length - 1) : 1;
+      };
+      col = v => rampColor(pos(v));
     } else {
       const vs=rows.map(val).sort((x,y)=>x-y);
       const q=p=>vs[Math.floor((vs.length-1)*p)];
@@ -325,16 +349,18 @@ function init(){
            <div style="color:var(--ink3);font-size:11.5px;margin-top:2px">
              추천 앱에서 답하신 조건 기준 · 100점 만점</div>
          </div>`
-        + [[SCORE_COLORS[4], `${cuts[3]?.toFixed(1)}점 이상 — 상위 20%`],
-           [SCORE_COLORS[3], `${cuts[2]?.toFixed(1)} ~ ${cuts[3]?.toFixed(1)}`],
-           [SCORE_COLORS[2], `${cuts[1]?.toFixed(1)} ~ ${cuts[2]?.toFixed(1)}`],
-           [SCORE_COLORS[1], `${cuts[0]?.toFixed(1)} ~ ${cuts[1]?.toFixed(1)}`],
-           [SCORE_COLORS[0], `${cuts[0]?.toFixed(1)}점 미만 — 하위 20%`]]
-          .map(([c,t])=>`<div><i style="background:${c}"></i>${t}</div>`).join("")
+        + `<div style="display:block">
+             <div style="height:12px;border-radius:6px;margin:2px 0 5px;
+                  background:linear-gradient(90deg,${RAMP.map((c,k)=>
+                    `rgb(${c[0]},${c[1]},${c[2]}) ${k/(RAMP.length-1)*100}%`).join(",")})"></div>
+             <div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--ink3)">
+               <span>${sv[0]?.toFixed(1)}점</span><span>${sv[sv.length-1]?.toFixed(1)}점</span></div>
+           </div>`
         + `<div><i style="background:#141a17"></i>근무지 · 반경 5/10/15km</div>`
         + `<div style="display:block;color:var(--ink3);font-size:11.5px;margin-top:6px">
-             ${dots ? "지도를 확대하면 점수가 숫자로 바뀝니다." : "축소하면 점으로 바뀝니다."}
-             흰 번호가 붙은 곳이 추천 상위 ${(SCORES.top||[]).length}곳입니다.</div>`;
+             색은 지금 보이는 ${rows.length.toLocaleString()}곳 안에서의 순위입니다.
+             ${dots ? "확대하면 점수가 숫자로 바뀝니다." : "축소하면 점으로 바뀝니다."}
+             흰 번호는 추천 상위 ${(SCORES.top||[]).length}곳입니다.</div>`;
     } else {
     const fmt = v => metric === "year" ? `${v}년`
                    : metric === "price" ? won(v)
@@ -360,7 +386,9 @@ function init(){
 
     const banner = document.getElementById("banner");
     if (metric === "score") {
-      banner.innerHTML = `<b>추천 점수로 칠했습니다</b>
+      const frac = Number(document.getElementById("top").value || 1);
+      banner.innerHTML = `<b>${frac < 1 ? `점수 상위 ${Math.round(frac*100)}%` : "조건에 맞는 단지 전체"}
+        · ${rows.length.toLocaleString()}곳</b>
         <div style="margin-top:3px">진한 초록일수록 조건에 잘 맞는 곳입니다.
         ${SCORES.ts ? new Date(SCORES.ts).toLocaleString("ko-KR") + " 기준" : ""}</div>
         <a href="app.html" style="display:inline-block;margin-top:8px;color:#0e6a4e">
@@ -386,10 +414,13 @@ function init(){
     }
   }
 
-  document.getElementById("note").innerHTML = LIVE
+  document.getElementById("topWrap").hidden = !SCORES;
+  document.getElementById("top").onchange = draw;
+  document.getElementById("note").innerHTML = `<div style="margin-bottom:6px;opacity:.7">
+    map.html ${MAP_VERSION}</div>` + (LIVE
     ? `국토부 실거래가 기반 <b>${APTS.length.toLocaleString()}개 단지</b>를 표시하고 있습니다.`
     : `<b>샘플 5개</b>로 표시 중입니다. <code>build_dataset.py --emit</code> 으로
-       <code>data/apts.js</code> 를 만들면 자동으로 실데이터로 바뀝니다.`;
+       <code>data/apts.js</code> 를 만들면 자동으로 실데이터로 바뀝니다.`);
 
   const msel = document.getElementById("metric");
   if (SCORES) {

@@ -4377,18 +4377,15 @@ function offerKakaoMap(shown){
       pick: shown.map(r=>r.apt.id).join(","),
       n: String(RAW.length), area: S.sizes[0] || "l", biz: S.biz,
     });
-    const link = (href, label, sub) =>
-      `<a class="ghost" href="${href}" target="_blank" rel="noopener"
-          style="display:block;text-decoration:none;text-align:left;padding:11px 15px">
-         <b style="font-weight:600">${label}</b>
-         <span style="display:block;font-size:12px;color:var(--ink-3);margin-top:2px">${sub}</span>
-       </a>`;
-    box.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap">
-      ${OK_SCORES ? link("map.html", "지도에서 점수로 보기 →",
-          `${APTS.length.toLocaleString()}곳 전체를 점수 색으로. 진할수록 조건에 맞습니다`) : ""}
-      ${link("map.html#" + q, `추천 ${shown.length}곳만 지도에서 보기 →`,
-          "순위 번호를 달아 그 15곳만 표시합니다")}
-    </div>`;
+    // 버튼 하나. 점수를 못 넘긴 경우에만 추천 15곳 링크로 대신한다.
+    box.innerHTML = `<a class="ghost" href="${OK_SCORES ? "map.html" : "map.html#" + q}"
+        target="_blank" rel="noopener"
+        style="display:block;text-decoration:none;text-align:left;padding:11px 15px">
+       <b style="font-weight:600">지도에서 점수로 보기 →</b>
+       <span style="display:block;font-size:12px;color:var(--ink-3);margin-top:2px">${
+         OK_SCORES ? "점수 상위 20%를 지도에 띄웁니다. 지도에서 범위를 넓힐 수 있습니다"
+                   : `추천 ${shown.length}곳을 순위와 함께 표시합니다`}</span>
+     </a>`;
     box.hidden = false;
   };
   if(MAP_HTML_OK === true) return build();
