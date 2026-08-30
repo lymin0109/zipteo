@@ -19,11 +19,10 @@
         그리고 developers.kakao.com → 앱 설정 → 플랫폼 → Web 에
         http://localhost:8000 을 사이트 도메인으로 등록해야 합니다.
      ───────────────────────────────────────────────────────────────────── -->
-<script>
-/* ▼▼ 여기 한 줄만 본인 JavaScript 키로 바꾸면 됩니다 ▼▼ */
-const KAKAO_JS_KEY = "1165165a0d6aa1ab5ca0b55f0ffd9fc3";
-/* ▲▲ ------------------------------------------ ▲▲ */
-</script>
+<!-- 카카오 JavaScript 키는 옆의 kakao-key.js 에 둡니다.
+     이 파일(map.html)을 새 버전으로 덮어써도 키는 그대로 남습니다.
+     kakao-key.sample.js 를 kakao-key.js 로 복사한 뒤 키 한 줄만 넣으세요. -->
+<script src="kakao-key.js" onerror="window.__nokeyfile=1"></script>
 
 <!-- build_dataset.py --emit 이 만든 파일. 없으면 아래 SAMPLE 로 대체됩니다. -->
 <script src="data/apts.js" onerror="window.__noLive=1"></script>
@@ -54,6 +53,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 .banner{font-size:12px;line-height:1.6;background:#e8f0ec;border:1px solid #bcd4c9;
         border-radius:9px;padding:11px 13px;color:#1d3a2e}
 .pin.ranked{padding-left:4px}
+.pin.dot{width:11px;height:11px;padding:0;border-width:1.5px;box-shadow:0 1px 3px rgba(0,0,0,.3)}
 .pin .rk{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;
          background:rgba(255,255,255,.92);color:#141a17;border-radius:999px;
          font-size:10.5px;margin-right:5px;font-weight:700}
@@ -67,6 +67,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;backgroun
     <div><label class="f">근무지</label><select id="biz"></select></div>
     <div><label class="f">색 기준</label>
       <select id="metric">
+        <option value="score">추천 점수</option>
         <option value="ppy">평당가</option>
         <option value="price">실거래가</option>
         <option value="year">준공년도</option>
@@ -129,6 +130,20 @@ const ppyOf = (price,area) => Math.round(price/(area/3.3058*1.32));   // 전용�
    app.html 이 map.html#pick=3,17,42&n=3355&area=l&biz=gangnam 형태로 넘깁니다.
    pick 은 RAW 배열의 인덱스입니다. 두 파일이 같은 데이터로 만들어졌을 때만
    인덱스가 일치하므로, n(전체 단지 수)으로 같은 판인지 확인합니다. */
+/* 추천 앱이 남긴 점수를 읽는다.
+   app.html 과 map.html 은 같은 도메인이라 localStorage 를 공유합니다.
+   URL 로 3,355개 점수를 넘길 수는 없으니 이 방법을 씁니다. */
+function readScores() {
+  try {
+    const raw = localStorage.getItem("jipteo:scores");
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (!d || !Array.isArray(d.score) || d.n !== APTS.length) return null;
+    return d;
+  } catch (e) { return null; }        // 사생활 보호 모드 등에서 접근이 막힐 수 있다
+}
+const SCORES = readScores();
+
 const HASH = new URLSearchParams(location.hash.slice(1));
 const PICK = (HASH.get("pick") || "").split(",").filter(x=>x!=="").map(Number);
 const PICK_N = Number(HASH.get("n") || 0);
@@ -142,8 +157,12 @@ function fail(kind, extra) {
   const origin = location.origin;
   const local = origin.startsWith("file://");
   const box = {
+    nofile:["kakao-key.js 파일이 없습니다.",
+            "같은 폴더의 <code>kakao-key.sample.js</code> 를 <code>kakao-key.js</code> 로 " +
+            "복사한 뒤, 그 안의 한 줄을 본인 <b>JavaScript 키</b>로 바꿔 올리세요. " +
+            "이 파일을 따로 둔 이유는, map.html 을 새 버전으로 덮어써도 키가 남게 하기 위해서입니다."],
     nokey: ["JavaScript 키가 아직 들어가지 않았습니다.",
-            "이 파일 상단의 <b>KAKAO_JS_KEY</b> 한 줄을 실제 키로 바꾸세요. " +
+            "<code>kakao-key.js</code> 안의 한 줄을 실제 키로 바꾸세요. " +
             "REST API 키가 아니라 <b>JavaScript 키</b>입니다."],
     file:  ["file:// 로 열면 동작하지 않습니다.",
             "카카오가 도메인을 검사하기 때문입니다. 같은 폴더에서 " +
@@ -167,7 +186,9 @@ function fail(kind, extra) {
     </div></div>`;
 }
 
-if (KAKAO_JS_KEY.includes("여기에")) {
+if (window.__nokeyfile || typeof KAKAO_JS_KEY === "undefined") {
+  fail("nofile");
+} else if (String(KAKAO_JS_KEY).includes("여기에")) {
   fail("nokey");
 } else if (location.protocol === "file:") {
   fail("file");
@@ -212,31 +233,59 @@ function init(){
           if (!ks.length) return null;
           const k = Math.max(...ks); p = {area:k, price:a.price[k]};
         }
-        return {a, ...p, rank: i + 1};
+        return {a, ...p, i: idx, rank: i + 1};
       }).filter(Boolean);
     } else {
-      rows = APTS.map(a=>{const p=pick(a,bucket); return p?{a,...p}:null;}).filter(Boolean);
+      rows = APTS.map((a,i)=>{const p=pick(a,bucket); return p?{a,i,...p}:null;}).filter(Boolean);
+      if (metric === "score" && SCORES) {
+        rows = rows.filter(r => SCORES.score[r.i] != null);
+        const rank = new Map((SCORES.top||[]).map((id,k)=>[id,k+1]));
+        rows.forEach(r => { if (rank.has(r.i)) r.rank = rank.get(r.i); });
+        rows.sort((x,y)=> (SCORES.score[x.i]) - (SCORES.score[y.i]));  // 높은 점수를 위에 그린다
+      }
     }
 
-    const val=r=> metric==="year" ? r.a.year
+    const val=r=> metric==="score" ? (SCORES ? SCORES.score[r.i] : null)
+               : metric==="year"  ? r.a.year
                : metric==="price" ? r.price
                : ppyOf(r.price,r.area);
-    const vs=rows.map(val).sort((x,y)=>x-y);
-    const q=p=>vs[Math.floor((vs.length-1)*p)];
-    const lo=q(0.33), hi=q(0.67);
-    const col=v=> v>=hi ? "#9c2f1f" : v>=lo ? "#9b6e17" : "#0e6a4e";
+
+    /* 점수는 가중치에 따라 대개 20~80 안에 몰립니다. 0~100 고정 구간으로 칠하면
+       거의 다 가운데 색이 돼서 '어디가 좋은지'가 안 보입니다.
+       그래서 5분위로 나누되, 범례에는 실제 점수 경계를 적어 둡니다. */
+    const SCORE_COLORS = ["#9c4a2f","#b5761b","#9b8b17","#2f8a63","#0b5c3f"];
+    let lo, hi, col, cuts = [];
+    if (metric === "score") {
+      const sv = rows.map(val).filter(v=>v!=null).sort((x,y)=>x-y);
+      cuts = [0.2,0.4,0.6,0.8].map(p => sv[Math.floor((sv.length-1)*p)]);
+      col = v => SCORE_COLORS[cuts.filter(c => v >= c).length];
+    } else {
+      const vs=rows.map(val).sort((x,y)=>x-y);
+      const q=p=>vs[Math.floor((vs.length-1)*p)];
+      lo=q(0.33); hi=q(0.67);
+      col = v => v>=hi ? "#9c2f1f" : v>=lo ? "#9b6e17" : "#0e6a4e";
+    }
+
+    /* 3,355개를 전부 가격표로 띄우면 서로 겹쳐서 아무것도 안 보입니다.
+       멀리서 볼 때(level 6 이상)는 점으로, 가까이 가면 숫자로 바꿉니다. */
+    const dots = metric === "score" && map.getLevel() >= 6;
 
     rows.forEach(r=>{
       const pos=new kakao.maps.LatLng(r.a.lat,r.a.lng);
       const el=document.createElement("div");
-      el.className="pin"; el.style.background=col(val(r));
-      const label = metric==="year" ? String(r.a.year)
+      const v = val(r);
+      el.className="pin"; el.style.background=col(v);
+      const label = metric==="score" ? (v==null?"—":Math.round(v))
+                  : metric==="year"  ? String(r.a.year)
                   : metric==="price" ? won(r.price)
                   : ppyOf(r.price,r.area).toLocaleString();
-      if (r.rank) {                       // 추천 모드 — 순위 배지를 앞에 붙인다
-        el.classList.add("ranked");
+      if (dots && !r.rank) {
+        el.classList.add("dot");          // 멀리서 볼 때 — 점만
+        el.title = `${r.a.name} ${Math.round(v)}점`;
+      } else if (r.rank) {
+        el.classList.add("ranked");       // 추천 상위 — 순위 배지
         el.innerHTML = `<b class="rk">${r.rank}</b>${label}`;
-        el.style.zIndex = 1000 - r.rank;
+        el.style.zIndex = 3000 - r.rank;
       } else {
         el.textContent = label;
       }
@@ -269,6 +318,24 @@ function init(){
 
     /* 범례 — 핀에 적힌 숫자가 '무엇'이고 '단위가 뭔지'를 분명히 적는다.
        색 경계도 실제 값으로 보여줘야 '상위 1/3'이 얼마인지 알 수 있습니다. */
+    if (metric === "score") {
+      document.getElementById("legend").innerHTML =
+        `<div style="display:block;margin-bottom:8px">
+           <b>핀의 숫자 = 추천 점수</b>
+           <div style="color:var(--ink3);font-size:11.5px;margin-top:2px">
+             추천 앱에서 답하신 조건 기준 · 100점 만점</div>
+         </div>`
+        + [[SCORE_COLORS[4], `${cuts[3]?.toFixed(1)}점 이상 — 상위 20%`],
+           [SCORE_COLORS[3], `${cuts[2]?.toFixed(1)} ~ ${cuts[3]?.toFixed(1)}`],
+           [SCORE_COLORS[2], `${cuts[1]?.toFixed(1)} ~ ${cuts[2]?.toFixed(1)}`],
+           [SCORE_COLORS[1], `${cuts[0]?.toFixed(1)} ~ ${cuts[1]?.toFixed(1)}`],
+           [SCORE_COLORS[0], `${cuts[0]?.toFixed(1)}점 미만 — 하위 20%`]]
+          .map(([c,t])=>`<div><i style="background:${c}"></i>${t}</div>`).join("")
+        + `<div><i style="background:#141a17"></i>근무지 · 반경 5/10/15km</div>`
+        + `<div style="display:block;color:var(--ink3);font-size:11.5px;margin-top:6px">
+             ${dots ? "지도를 확대하면 점수가 숫자로 바뀝니다." : "축소하면 점으로 바뀝니다."}
+             흰 번호가 붙은 곳이 추천 상위 ${(SCORES.top||[]).length}곳입니다.</div>`;
+    } else {
     const fmt = v => metric === "year" ? `${v}년`
                    : metric === "price" ? won(v)
                    : `${Math.round(v).toLocaleString()}만`;
@@ -288,10 +355,18 @@ function init(){
       + `<div style="display:block;color:var(--ink3);font-size:11.5px;margin-top:6px">
            색은 지금 화면의 ${rows.length.toLocaleString()}곳을 3등분한 기준입니다.
            평형을 바꾸면 경계도 바뀝니다.</div>`;
+    }
     document.getElementById("areaLab").textContent = `(${rows.length}곳)`;
 
     const banner = document.getElementById("banner");
-    if (PICK_OK) {
+    if (metric === "score") {
+      banner.innerHTML = `<b>추천 점수로 칠했습니다</b>
+        <div style="margin-top:3px">진한 초록일수록 조건에 잘 맞는 곳입니다.
+        ${SCORES.ts ? new Date(SCORES.ts).toLocaleString("ko-KR") + " 기준" : ""}</div>
+        <a href="app.html" style="display:inline-block;margin-top:8px;color:#0e6a4e">
+          → 조건 바꾸러 가기</a>`;
+      banner.hidden = false;
+    } else if (PICK_OK) {
       banner.innerHTML = `<b>추천 ${rows.length}곳만 표시 중</b>
         <div style="margin-top:3px">핀 앞의 번호가 추천 순위입니다.</div>
         <a href="${location.pathname}" style="display:inline-block;margin-top:8px;color:#0e6a4e">
@@ -316,9 +391,23 @@ function init(){
     : `<b>샘플 5개</b>로 표시 중입니다. <code>build_dataset.py --emit</code> 으로
        <code>data/apts.js</code> 를 만들면 자동으로 실데이터로 바뀝니다.`;
 
+  const msel = document.getElementById("metric");
+  if (SCORES) {
+    msel.value = "score";
+    if (SCORES.area) document.getElementById("area").value = SCORES.area;
+    if (SCORES.biz) bizSel.value = SCORES.biz;
+  } else {
+    msel.querySelector('option[value="score"]').remove();   // 점수가 없으면 선택지도 없앤다
+  }
   if (HASH.get("area")) document.getElementById("area").value = HASH.get("area");
   if (HASH.get("biz")) bizSel.value = HASH.get("biz");
   ["biz","metric","area"].forEach(id=>document.getElementById(id).onchange=draw);
+  /* 점 ↔ 숫자 전환 때문에 확대·축소마다 다시 그린다.
+     연속으로 바뀔 때 매번 그리면 버벅여서 조금 묶어서 처리합니다. */
+  let zt = null;
+  kakao.maps.event.addListener(map, "zoom_changed", () => {
+    clearTimeout(zt); zt = setTimeout(draw, 120);
+  });
   draw();
 }
 </script>
