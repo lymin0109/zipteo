@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>집터 — 서울 아파트 추천</title>
+<meta name="description" content="자금·직주근접·학군·인프라·미래가치·상품성 여섯 가지로 서울 아파트 3,355곳을 평가합니다.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600&display=swap">
+<style>
+:root{
+  --bg:#EDEFEE; --surface:#FBFCFB; --ink:#141A17; --ink-2:#3D4844; --ink-3:#717B77;
+  --line:#D7DCD9; --accent:#0E6A4E;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font:400 15px/1.7 "IBM Plex Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:720px;margin:0 auto;padding:56px 24px 72px}
+.mark{font-family:"Gowun Batang",serif;font-size:28px;font-weight:700;letter-spacing:-.02em;margin:0}
+.mark span{display:block;font-family:inherit;font-size:11px;font-weight:400;color:var(--ink-3);
+  letter-spacing:.16em;text-transform:uppercase;margin-top:6px}
+.lede{color:var(--ink-2);margin:18px 0 36px}
+.cards{display:grid;gap:14px}
+a.card{display:block;text-decoration:none;color:inherit;background:var(--surface);
+  border:1px solid var(--line);border-radius:12px;padding:20px 22px;transition:.15s}
+a.card:hover{border-color:var(--accent);transform:translateY(-1px)}
+a.card h2{margin:0 0 4px;font-size:16px;font-weight:600}
+a.card p{margin:0;font-size:13.5px;color:var(--ink-3)}
+h3{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);
+  font-weight:600;margin:44px 0 12px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+td{padding:6px 12px 6px 0;vertical-align:top;border-bottom:1px solid var(--line)}
+td:first-child{white-space:nowrap;font-weight:500;width:11em}
+td:last-child{color:var(--ink-3)}
+.note{font-size:12.5px;color:var(--ink-3);line-height:1.75;border-top:1px solid var(--line);
+  margin-top:40px;padding-top:18px}
+.note b{color:var(--ink-2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1 class="mark">집터<span>Seoul Apartment Fit</span></h1>
+
+  <p class="lede">
+    서울 아파트 <b>3,355곳</b>을 자금·직주근접·학군·생활 인프라·미래가치·상품성
+    여섯 가지로 평가해 순위를 냅니다. 질문 여섯 개에 답하면 그 상황에 맞는 순서로 다시 정렬됩니다.
+  </p>
+
+  <div class="cards">
+    <a class="card" href="app.html">
+      <h2>추천 받기 →</h2>
+      <p>질문에 답하면 점수 근거까지 펼쳐 보여줍니다. 지도는 직접 그린 개략도라 별도 설정이 필요 없습니다.</p>
+    </a>
+    <a class="card" href="map.html">
+      <h2>카카오맵으로 보기 →</h2>
+      <p>실제 지도 위에서 평당가·실거래가·준공년도를 색으로 비교합니다. 카카오 JavaScript 키가 필요합니다.</p>
+    </a>
+  </div>
+
+  <h3>데이터 출처</h3>
+  <table>
+    <tr><td>실거래가</td><td>국토교통부 아파트 매매 실거래가 상세 자료 (공공데이터포털)</td></tr>
+    <tr><td>단지 정보</td><td>국토교통부 공동주택 기본·상세 정보 — K-apt (공공데이터포털)</td></tr>
+    <tr><td>생활 인프라</td><td>카카오 로컬 API — 마트·병원·상권·공원</td></tr>
+    <tr><td>통근시간</td><td>카카오모빌리티 길찾기 · ODsay 대중교통</td></tr>
+    <tr><td>통학로</td><td>TMAP 보행자 경로안내</td></tr>
+  </table>
+
+  <div class="note">
+    <b>가격은 호가가 아닙니다.</b> 최근 12개월 실거래 중위값을 구별 월별 시세 흐름으로
+    최근 달 기준 환산한 대표 시세입니다. 호가는 공개 API가 없습니다.<br>
+    <b>아직 비어 있는 항목이 있습니다.</b> 어느 항목이 몇 % 채워졌는지는 추천 결과 화면 맨 아래
+    표에 그대로 적어 뒀습니다. 0%인 항목은 모든 단지에 같은 기본값이 들어가며 순위에 영향을 주지 않습니다.<br>
+    이 도구는 참고용이며 투자 자문이 아닙니다. 실제 매수 전에는 현장 확인과 전문가 상담이 필요합니다.
+  </div>
+
+</div>
+</body>
+</html>
