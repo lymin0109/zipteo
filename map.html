@@ -57,12 +57,38 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 .pin .rk{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;
          background:rgba(255,255,255,.92);color:#141a17;border-radius:999px;
          font-size:10.5px;margin-right:5px;font-weight:700}
+/* ── 모바일 ────────────────────────────────────────────────────────────
+   좁은 화면에서는 300px 사이드바가 화면을 다 먹습니다. 위아래로 쌓고,
+   지도를 위에 크게 두고 설정은 접었다 펼 수 있게 합니다. */
+#sheetBtn{display:none}
+@media (max-width:760px){
+  html,body{height:100%}
+  #app{display:flex;flex-direction:column;height:100dvh;height:100vh}
+  #map{order:0;flex:1 1 auto;min-height:0}
+  aside{order:1;flex:0 0 auto;max-height:38dvh;max-height:38vh;overflow:auto;
+        border-right:0;border-top:1px solid var(--line);padding:10px 16px 16px;gap:11px;
+        box-shadow:0 -6px 20px rgba(0,0,0,.09)}
+  aside.folded{max-height:52px;overflow:hidden;padding-top:8px}
+  #sheetBtn{display:flex;align-items:center;justify-content:center;gap:7px;
+    width:100%;padding:7px;margin:-4px 0 0;border:1px solid var(--line);
+    border-radius:999px;background:var(--surface);font-size:12.5px;color:var(--ink3);
+    font-weight:600;order:-1}
+  h1{font-size:14px}
+  h1 small{display:none}
+  label.f{margin-bottom:4px;font-size:11.5px}
+  .banner{font-size:11.5px;padding:9px 11px}
+  .note{padding-top:10px}
+  select{padding:10px}
+  .pin{font-size:11px;padding:4px 8px}
+  .legend{padding-top:11px;gap:6px}
+}
 .err{padding:24px;font-size:13px;color:#9c3a21;line-height:1.8}
 </style>
 </head>
 <body>
 <div id="app">
   <aside>
+    <button id="sheetBtn" type="button" aria-expanded="true">설정 접기 ▾</button>
     <h1>집터 <small>KAKAO MAP VIEW</small></h1>
     <div><label class="f">근무지</label><select id="biz"></select></div>
     <div><label class="f">색 기준</label>
@@ -439,6 +465,20 @@ function init(){
   } else {
     msel.querySelector('option[value="score"]').remove();   // 점수가 없으면 선택지도 없앤다
   }
+  /* 모바일 — 설정 패널 접기/펴기. 접었다 펴면 지도 크기가 바뀌므로
+     카카오에 다시 재보라고(relayout) 알려줘야 지도가 잘리지 않습니다. */
+  const aside = document.querySelector("aside"), sheet = document.getElementById("sheetBtn");
+  sheet.onclick = () => {
+    const folded = aside.classList.toggle("folded");
+    sheet.textContent = folded ? "설정 펼치기 ▴" : "설정 접기 ▾";
+    sheet.setAttribute("aria-expanded", String(!folded));
+    setTimeout(() => map.relayout(), 210);
+  };
+  let rt = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(rt); rt = setTimeout(() => { map.relayout(); draw(); }, 200);
+  });
+
   if (HASH.get("area")) document.getElementById("area").value = HASH.get("area");
   if (HASH.get("biz")) bizSel.value = HASH.get("biz");
   ["biz","metric","area"].forEach(id=>document.getElementById(id).onchange=draw);
