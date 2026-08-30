@@ -4294,7 +4294,9 @@ function detailHTML(r){
       const t=tierOf(a,k), w=a.inf.why&&a.inf.why[k];
       return `${INF_L[k]} <em>${t}등급</em>·${TIER_L[t]}${w?` <span class="mut">${esc(w)}</span>`:""}`;
     }).join(a.inf.why?"<br>":" · ")],
-    ["미래가치", `2년 내 인근 입주물량 부담 <em>${a.fut.sup<25?"낮음":a.fut.sup<45?"보통":"높음"}</em> · 최근 1년 <em>+${a.fut.mo}%</em>`
+    ["미래가치", `2년 내 인근 입주물량 부담 <em>${a.fut.sup<25?"낮음":a.fut.sup<45?"보통":"높음"}</em>`
+      + ` · 최근 1년 <em>${a.fut.mo>=0?"+":""}${a.fut.mo}%</em>`
+      + (a.fut.moLv?`<span class="mut"> ${a.fut.moLv} 기준</span>`:"")
       + (a.fut.dev.length?` · ${a.fut.dev.join(", ")}`:" · 특이 호재 없음")],
     ["상품성", `${a.units.toLocaleString()}세대 · ${a.year}년 준공 (${YEAR-a.year}년차) · ${a.brand} · 세대당 주차 <em>${a.park}대</em> · 용적률 ${a.far}%`]
   ];
@@ -4346,6 +4348,32 @@ function cardHTML(r,i){
   </article>`;
 }
 
+/* 카카오맵 뷰로 넘기기 — 같은 폴더에 map.html 이 있을 때만 버튼을 띄운다.
+   아티팩트로 볼 때는 옆에 map.html 이 없으므로 조용히 숨깁니다.
+   넘기는 것은 RAW 배열의 인덱스입니다. 두 파일이 같은 데이터여야 맞으므로
+   전체 단지 수(n)를 같이 넘겨서 지도 쪽에서 확인하게 합니다. */
+let MAP_HTML_OK = null;
+function offerKakaoMap(shown){
+  const box = document.getElementById("kakaolink");
+  if(!box) return;
+  const build = () => {
+    const q = new URLSearchParams({
+      pick: shown.map(r=>r.apt.id).join(","),
+      n: String(RAW.length), area: S.sizes[0] || "l", biz: S.biz,
+    });
+    box.innerHTML = `<a class="ghost" href="map.html#${q}" target="_blank" rel="noopener"
+      style="display:inline-flex;align-items:center;gap:7px;text-decoration:none">
+      추천 ${shown.length}곳을 카카오맵에서 보기 →</a>`;
+    box.hidden = false;
+  };
+  if(MAP_HTML_OK === true) return build();
+  if(MAP_HTML_OK === false) return;
+  if(!location.protocol.startsWith("http")) { MAP_HTML_OK = false; return; }
+  fetch("map.html", {method:"HEAD"})
+    .then(r => { MAP_HTML_OK = r.ok; if(r.ok) build(); })
+    .catch(() => { MAP_HTML_OK = false; });
+}
+
 function renderResults(){
   document.getElementById("restart").hidden=false;
   const rows=evaluate();
@@ -4363,6 +4391,7 @@ function renderResults(){
     return;
   }
   const top=shown[0];
+  setTimeout(()=>offerKakaoMap(shown), 0);
   app.innerHTML=`<div class="res">
     <div class="summary">
       <div class="stat"><span class="k">매수 가능 최대가</span><span class="v">${won(mpN)}</span>
@@ -4401,6 +4430,7 @@ function renderResults(){
       </div>
     </div>
     ${shown.length?mapHTML(shown,rows):""}
+    <div id="kakaolink" hidden style="margin-top:14px"></div>
     <div class="foot">
       <b>데이터에 관하여</b>
       ${(() => {
@@ -4412,7 +4442,7 @@ function renderResults(){
           ["최인접 지하철역",     COVER.st,    "K-apt · 카카오 로컬"],
           ["초등학교 도보시간",   COVER.el,    "TMAP 보행자 경로 (없으면 직선거리 추정)"],
           ["중학교 학업성취",     COVER.ms,    "학교알리미 — 아직 연결 전"],
-          ["최근 1년 상승률",     COVER.mo,    "아직 연결 전"],
+          ["최근 1년 상승률",     COVER.mo,    "실거래 — 같은 평형끼리 비교해 산출 (단지 표본이 적으면 동·구 단위)"],
           ["입주물량 · 정비사업", COVER.sup,   "아직 연결 전"],
           ["용적률",             COVER.far,   "건축물대장 표제부 — 아직 연결 전"],
         ];

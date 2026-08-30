@@ -51,6 +51,12 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;backgroun
 .iw b{font-size:14px}
 .iw table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px}
 .iw td{padding:2px 0}.iw td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.banner{font-size:12px;line-height:1.6;background:#e8f0ec;border:1px solid #bcd4c9;
+        border-radius:9px;padding:11px 13px;color:#1d3a2e}
+.pin.ranked{padding-left:4px}
+.pin .rk{display:inline-block;min-width:16px;height:16px;line-height:16px;text-align:center;
+         background:rgba(255,255,255,.92);color:#141a17;border-radius:999px;
+         font-size:10.5px;margin-right:5px;font-weight:700}
 .err{padding:24px;font-size:13px;color:#9c3a21;line-height:1.8}
 </style>
 </head>
@@ -70,6 +76,7 @@ select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;backgroun
         <option value="m">전용 59~84㎡ (24~29평형)</option>
         <option value="l" selected>전용 84㎡ (34평형)</option>
         <option value="xl">전용 84㎡ 초과 대형</option></select></div>
+    <div class="banner" id="banner" hidden></div>
     <div class="legend" id="legend"></div>
     <div class="note" id="note"></div>
   </aside>
@@ -117,6 +124,16 @@ const pick = (apt,bucket) => {           // 선택한 평형대에서 가장 큰
   const k=Math.max(...ks); return {area:k, price:apt.price[k]};
 };
 const ppyOf = (price,area) => Math.round(price/(area/3.3058*1.32));   // 전용→공급 환산 후 평당
+
+/* ── 추천 앱에서 넘어온 목록 ───────────────────────────────────────────
+   app.html 이 map.html#pick=3,17,42&n=3355&area=l&biz=gangnam 형태로 넘깁니다.
+   pick 은 RAW 배열의 인덱스입니다. 두 파일이 같은 데이터로 만들어졌을 때만
+   인덱스가 일치하므로, n(전체 단지 수)으로 같은 판인지 확인합니다. */
+const HASH = new URLSearchParams(location.hash.slice(1));
+const PICK = (HASH.get("pick") || "").split(",").filter(x=>x!=="").map(Number);
+const PICK_N = Number(HASH.get("n") || 0);
+const PICK_OK = PICK.length > 0 && (!PICK_N || PICK_N === APTS.length);
+const PICK_STALE = PICK.length > 0 && PICK_N && PICK_N !== APTS.length;
 
 /* SDK를 동적으로 불러오고, 실패하면 '무엇이 왜 안 됐는지'를 화면에 적는다.
    예전에는 document.write 로 넣고 실패 사유를 구분하지 않아서, 키 문제인지
@@ -183,7 +200,23 @@ function init(){
     clear();
     const bucket=document.getElementById("area").value;
     const metric=document.getElementById("metric").value;
-    const rows=APTS.map(a=>{const p=pick(a,bucket); return p?{a,...p}:null;}).filter(Boolean);
+    let rows;
+    if (PICK_OK) {
+      // 추천 모드 — 넘어온 순서를 그대로 순위로 쓴다.
+      // 그 단지에 선택 평형이 없으면 가장 큰 평형으로 대신 보여준다(빠뜨리지 않기 위해).
+      rows = PICK.map((idx, i) => {
+        const a = APTS[idx]; if (!a) return null;
+        let p = pick(a, bucket);
+        if (!p) {
+          const ks = Object.keys(a.price).map(Number);
+          if (!ks.length) return null;
+          const k = Math.max(...ks); p = {area:k, price:a.price[k]};
+        }
+        return {a, ...p, rank: i + 1};
+      }).filter(Boolean);
+    } else {
+      rows = APTS.map(a=>{const p=pick(a,bucket); return p?{a,...p}:null;}).filter(Boolean);
+    }
 
     const val=r=> metric==="year" ? r.a.year
                : metric==="price" ? r.price
@@ -197,9 +230,16 @@ function init(){
       const pos=new kakao.maps.LatLng(r.a.lat,r.a.lng);
       const el=document.createElement("div");
       el.className="pin"; el.style.background=col(val(r));
-      el.textContent = metric==="year" ? r.a.year
-                     : metric==="price" ? won(r.price)
-                     : ppyOf(r.price,r.area).toLocaleString();
+      const label = metric==="year" ? String(r.a.year)
+                  : metric==="price" ? won(r.price)
+                  : ppyOf(r.price,r.area).toLocaleString();
+      if (r.rank) {                       // 추천 모드 — 순위 배지를 앞에 붙인다
+        el.classList.add("ranked");
+        el.innerHTML = `<b class="rk">${r.rank}</b>${label}`;
+        el.style.zIndex = 1000 - r.rank;
+      } else {
+        el.textContent = label;
+      }
       const ov=new kakao.maps.CustomOverlay({position:pos,content:el,yAnchor:.5,clickable:true});
       ov.setMap(map); overlays.push(ov);
 
@@ -227,11 +267,48 @@ function init(){
       c.setMap(map); circles.push(c);
     });
 
+    /* 범례 — 핀에 적힌 숫자가 '무엇'이고 '단위가 뭔지'를 분명히 적는다.
+       색 경계도 실제 값으로 보여줘야 '상위 1/3'이 얼마인지 알 수 있습니다. */
+    const fmt = v => metric === "year" ? `${v}년`
+                   : metric === "price" ? won(v)
+                   : `${Math.round(v).toLocaleString()}만`;
+    const what = {ppy:  ["평당가", "공급면적 1평당 만원"],
+                  price:["실거래가", "그 평형의 대표 시세"],
+                  year: ["준공년도", "사용승인 연도"]}[metric];
     document.getElementById("legend").innerHTML =
-      [["#0e6a4e","하위 1/3"],["#9b6e17","중간"],["#9c2f1f","상위 1/3"]]
-      .map(([c,t])=>`<div><i style="background:${c}"></i>${t}</div>`).join("")
-      + `<div><i style="background:#141a17"></i>근무지 · 반경 5/10/15km</div>`;
+      `<div style="display:block;margin-bottom:8px">
+         <b>핀의 숫자 = ${what[0]}</b>
+         <div style="color:var(--ink3);font-size:11.5px;margin-top:2px">${what[1]}</div>
+       </div>`
+      + [["#0e6a4e", `${fmt(lo)} 미만`],
+         ["#9b6e17", `${fmt(lo)} ~ ${fmt(hi)}`],
+         ["#9c2f1f", `${fmt(hi)} 이상`]]
+        .map(([c,t])=>`<div><i style="background:${c}"></i>${t}</div>`).join("")
+      + `<div><i style="background:#141a17"></i>근무지 · 반경 5/10/15km</div>`
+      + `<div style="display:block;color:var(--ink3);font-size:11.5px;margin-top:6px">
+           색은 지금 화면의 ${rows.length.toLocaleString()}곳을 3등분한 기준입니다.
+           평형을 바꾸면 경계도 바뀝니다.</div>`;
     document.getElementById("areaLab").textContent = `(${rows.length}곳)`;
+
+    const banner = document.getElementById("banner");
+    if (PICK_OK) {
+      banner.innerHTML = `<b>추천 ${rows.length}곳만 표시 중</b>
+        <div style="margin-top:3px">핀 앞의 번호가 추천 순위입니다.</div>
+        <a href="${location.pathname}" style="display:inline-block;margin-top:8px;color:#0e6a4e">
+          → 서울 전체 보기</a>`;
+      banner.hidden = false;
+      const bd = new kakao.maps.LatLngBounds();
+      rows.forEach(r => bd.extend(new kakao.maps.LatLng(r.a.lat, r.a.lng)));
+      if (rows.length) map.setBounds(bd);
+    } else if (PICK_STALE) {
+      banner.innerHTML = `<b>추천 목록을 표시할 수 없습니다.</b>
+        <div style="margin-top:3px">추천 앱은 ${PICK_N.toLocaleString()}곳,
+        이 지도는 ${APTS.length.toLocaleString()}곳을 들고 있습니다.
+        <code>data/apts.js</code> 와 <code>app.html</code> 을 같은 데이터로 맞춰주세요.</div>`;
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
   }
 
   document.getElementById("note").innerHTML = LIVE
@@ -239,6 +316,8 @@ function init(){
     : `<b>샘플 5개</b>로 표시 중입니다. <code>build_dataset.py --emit</code> 으로
        <code>data/apts.js</code> 를 만들면 자동으로 실데이터로 바뀝니다.`;
 
+  if (HASH.get("area")) document.getElementById("area").value = HASH.get("area");
+  if (HASH.get("biz")) bizSel.value = HASH.get("biz");
   ["biz","metric","area"].forEach(id=>document.getElementById(id).onchange=draw);
   draw();
 }
