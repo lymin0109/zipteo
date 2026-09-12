@@ -4,4 +4,4 @@
 
    map.html 을 새 버전으로 덮어써도 이 파일은 그대로 남습니다.
    그래서 키를 다시 넣을 필요가 없습니다. */
-const KAKAO_JS_KEY = "1165165a0d6aa1ab5ca0b55f0ffd9fc3";
+const KAKAO_JS_KEY = "여기에_JavaScript_키";
