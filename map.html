@@ -24,8 +24,10 @@
      kakao-key.sample.js 를 kakao-key.js 로 복사한 뒤 키 한 줄만 넣으세요. -->
 <script src="kakao-key.js" onerror="window.__nokeyfile=1"></script>
 
-<!-- build_dataset.py --emit 이 만든 파일. 없으면 아래 SAMPLE 로 대체됩니다. -->
-<script src="data/apts.js" onerror="window.__noLive=1"></script>
+<!-- build_dataset.py --emit 이 만든 파일. 없으면 아래 SAMPLE 로 대체됩니다.
+     ?v= 는 publish_site.py 가 데이터 해시로 바꿔 넣습니다. 데이터가 바뀌면 주소가 달라져서
+     예전에 받아둔 파일(브라우저 캐시) 대신 새 파일을 받습니다. -->
+<script src="data/apts.js?v=c57df1b7" onerror="window.__noLive=1"></script>
 
 <style>
 :root{--ink:#141a17;--ink3:#717b77;--line:#d7dcd9;--surface:#fbfcfb;--bg:#eff1f0;
@@ -175,7 +177,7 @@ function readScores() {
   } catch (e) { return null; }        // 사생활 보호 모드 등에서 접근이 막힐 수 있다
 }
 const SCORES = readScores();
-const MAP_VERSION = "2026-09-27a";     // 배포된 파일이 최신인지 확인용
+const MAP_VERSION = "2026-09-27-c57d";     // 배포된 파일이 최신인지 확인용
 
 const HASH = new URLSearchParams(location.hash.slice(1));
 const PICK = (HASH.get("pick") || "").split(",").filter(x=>x!=="").map(Number);
