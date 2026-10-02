@@ -27,7 +27,7 @@
 <!-- build_dataset.py --emit 이 만든 파일. 없으면 아래 SAMPLE 로 대체됩니다.
      ?v= 는 publish_site.py 가 데이터 해시로 바꿔 넣습니다. 데이터가 바뀌면 주소가 달라져서
      예전에 받아둔 파일(브라우저 캐시) 대신 새 파일을 받습니다. -->
-<script src="data/apts.js?v=2bdebbb1" onerror="window.__noLive=1"></script>
+<script src="data/apts.js?v=f3ab1369" onerror="window.__noLive=1"></script>
 
 <style>
 :root{--ink:#141a17;--ink3:#717b77;--line:#d7dcd9;--surface:#fbfcfb;--bg:#eff1f0;
@@ -177,7 +177,7 @@ function readScores() {
   } catch (e) { return null; }        // 사생활 보호 모드 등에서 접근이 막힐 수 있다
 }
 const SCORES = readScores();
-const MAP_VERSION = "2026-10-02-2bde";     // 배포된 파일이 최신인지 확인용
+const MAP_VERSION = "2026-10-02-f3ab";     // 배포된 파일이 최신인지 확인용
 
 const HASH = new URLSearchParams(location.hash.slice(1));
 const PICK = (HASH.get("pick") || "").split(",").filter(x=>x!=="").map(Number);
