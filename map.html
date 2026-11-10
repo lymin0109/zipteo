@@ -272,7 +272,15 @@ function init(){
       }).filter(Boolean);
     } else {
       // 아파트 단지가 아닌 건물(업무·판매시설에 아파트 몇십 호, fut.na)은 지도에 찍지 않는다
-      rows = APTS.map((a,i)=>{ if (a.fut && a.fut.na) return null; const p=pick(a,bucket); return p?{a,i,...p}:null;}).filter(Boolean);
+      // 점수 모드에서는 추천 앱이 그 점수를 매긴 평형의 가격을 보여준다 (SCORES.areas).
+      // 위의 평형 선택값으로 고르면 예산 안의 59㎡로 매긴 점수 옆에 예산 밖 84㎡ 가격이 뜰 수 있습니다.
+      const scoredArea = i => (metric === "score" && SCORES && Array.isArray(SCORES.areas)) ? SCORES.areas[i] : null;
+      rows = APTS.map((a,i)=>{
+        if (a.fut && a.fut.na) return null;
+        const k = scoredArea(i);
+        const p = (k != null && a.price[k] != null) ? {area:k, price:a.price[k]} : pick(a,bucket);
+        return p?{a,i,...p}:null;
+      }).filter(Boolean);
       if (metric === "score" && SCORES) {
         rows = rows.filter(r => SCORES.score[r.i] != null);
         rows.sort((x,y)=> SCORES.score[y.i] - SCORES.score[x.i]);      // 높은 점수 먼저
